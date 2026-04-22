@@ -8,7 +8,7 @@ return new class extends Migration
 {
     /**
      * Normalization applied:
-     * - Removed empname, empposition, empclass, date_hired → derivable via empid
+     * - Removed empname, empposition, empclass, date_hired → derivable via employid
      * - approver1, approver2 renamed to approver1_emp_num, approver2_emp_num
      *   (approver name/position/dept derivable via those emp_num references)
      */
@@ -16,7 +16,7 @@ return new class extends Migration
     {
         Schema::create('old_coe_record', function (Blueprint $table) {
             $table->increments('id');
-            $table->string('empid', 45)->nullable();
+            $table->string('employid', 45)->nullable();
             $table->string('purpose', 100)->nullable();
             $table->dateTime('date_request')->nullable();
             $table->string('coe_type', 100)->nullable();

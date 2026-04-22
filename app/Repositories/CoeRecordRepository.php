@@ -9,26 +9,18 @@ class CoeRecordRepository
 {
     public function __construct(protected CoeRecord $model) {}
 
-    /**
-     * Paginated, filtered, sorted list of COE records.
-     */
+
+
     public function paginate(
         int $perPage = 10,
+        int $page = 1,
         ?string $search = null,
         ?string $status = null,
         ?string $coeType = null,
         string $sortBy = 'id',
         string $sortDir = 'desc'
     ): LengthAwarePaginator {
-        $allowedSorts = [
-            'id',
-            'empid',
-            'purpose',
-            'date_request',
-            'coe_type',
-            'status',
-            'pcn_status',
-        ];
+        $allowedSorts = ['id', 'employid', 'purpose', 'date_request', 'coe_type', 'status', 'pcn_status'];
 
         $sortBy  = in_array($sortBy, $allowedSorts) ? $sortBy : 'id';
         $sortDir = in_array(strtolower($sortDir), ['asc', 'desc']) ? $sortDir : 'desc';
@@ -36,16 +28,14 @@ class CoeRecordRepository
         return $this->model->newQuery()
             ->when(
                 $search,
-                fn($q) =>
-                $q->where('empid', 'like', "%{$search}%")
+                fn($q) => $q->where('employid', 'like', "%{$search}%")
                     ->orWhere('purpose', 'like', "%{$search}%")
                     ->orWhere('remarks', 'like', "%{$search}%")
             )
-            ->when($status, fn($q) => $q->where('status', $status))
+            ->when($status,  fn($q) => $q->where('status',   $status))
             ->when($coeType, fn($q) => $q->where('coe_type', $coeType))
             ->orderBy($sortBy, $sortDir)
-            ->paginate($perPage)
-            ->withQueryString();
+            ->paginate(perPage: $perPage, page: $page);  // ← pass page, drop withQueryString()
     }
 
     public function findById(int $id): ?CoeRecord

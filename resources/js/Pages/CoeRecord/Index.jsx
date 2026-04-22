@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useTransition } from "react";
+import { useRef } from "react";
 import { router, usePage } from "@inertiajs/react";
 import {
     Table,
@@ -9,7 +9,6 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
     Select,
@@ -18,33 +17,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-    ChevronUp,
-    ChevronDown,
-    ChevronsUpDown,
-    ChevronLeft,
-    ChevronRight,
-    ChevronsLeft,
-    ChevronsRight,
-    Search,
-    SlidersHorizontal,
-} from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronsUpDown, Search } from "lucide-react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import { Pagination } from "@/Components/Pagination";
+import { useCoeFilters } from "./hooks/useCoeFilter";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-
-const STATUS_MAP = {
-    1: { label: "Pending", variant: "outline" },
-    2: { label: "Approved", variant: "default" },
-    3: { label: "Rejected", variant: "destructive" },
-};
 
 const COE_TYPE_MAP = {
     1: "Employment",
@@ -56,44 +35,77 @@ const PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/**
- * Encode filter state as base64 JSON for the ?q= hash param.
- */
-function encodeParams(params) {
-    return btoa(JSON.stringify(params));
+function getStatusInfo(status, coeType, empClass, pcnStatus) {
+    const statusNum = parseInt(status);
+    const coeTypeNum = parseInt(coeType);
+    const empClassNum = parseInt(empClass);
+    const pcnStatusNum = parseInt(pcnStatus);
+
+    if (statusNum === 0) return { label: "For Approval", variant: "warning" };
+    if (statusNum === 1 && coeTypeNum !== 3)
+        return { label: "Approved", variant: "success" };
+    if (
+        statusNum === 1 &&
+        empClassNum === 1 &&
+        pcnStatusNum !== 0 &&
+        coeTypeNum === 3
+    )
+        return { label: "Approved", variant: "success" };
+    if (statusNum === 1 && empClassNum !== 1)
+        return { label: "For Processing", variant: "success" };
+    if (
+        statusNum === 1 &&
+        empClassNum === 1 &&
+        pcnStatusNum === 0 &&
+        coeTypeNum === 3
+    )
+        return { label: "For Processing", variant: "success" };
+    if (statusNum === 2) return { label: "Generated", variant: "info" };
+    if (statusNum === 3)
+        return { label: "Disapproved", variant: "destructive" };
+    if (statusNum === 5)
+        return { label: "Available for Claim", variant: "destructive" };
+
+    return { label: "Unknown Status", variant: "secondary" };
 }
 
-/**
- * Build the URL with the encoded ?q= param.
- */
-function buildUrl(params) {
-    const hash = encodeParams(params);
-    return `${window.location.pathname}?q=${hash}`;
+function getBadgeVariant(variant) {
+    switch (variant) {
+        case "warning":
+            return "outline";
+        case "success":
+            return "default";
+        case "info":
+            return "secondary";
+        case "destructive":
+            return "destructive";
+        default:
+            return "secondary";
+    }
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-function SortIcon({ column, sortBy, sortDir }) {
-    if (sortBy !== column)
-        return (
-            <ChevronsUpDown className="ml-1 h-3.5 w-3.5 text-muted-foreground" />
-        );
-    return sortDir === "asc" ? (
-        <ChevronUp className="ml-1 h-3.5 w-3.5" />
-    ) : (
-        <ChevronDown className="ml-1 h-3.5 w-3.5" />
+function StatusBadge({ status, coeType, empClass, pcnStatus }) {
+    const { label, variant } = getStatusInfo(
+        status,
+        coeType,
+        empClass,
+        pcnStatus,
+    );
+    return (
+        <Badge
+            variant={getBadgeVariant(variant)}
+            className={
+                variant === "warning"
+                    ? "bg-yellow-500 text-white hover:bg-yellow-600"
+                    : ""
+            }
+        >
+            {label}
+        </Badge>
     );
 }
 
-function StatusBadge({ status }) {
-    const s = STATUS_MAP[status] ?? {
-        label: status ?? "—",
-        variant: "secondary",
-    };
-    return <Badge variant={s.variant}>{s.label}</Badge>;
-}
-
-function TableSkeleton({ rows = 10, cols = 8 }) {
+function TableSkeleton({ rows = 10, cols = 12 }) {
     return Array.from({ length: rows }).map((_, i) => (
         <TableRow key={i}>
             {Array.from({ length: cols }).map((_, j) => (
@@ -105,92 +117,74 @@ function TableSkeleton({ rows = 10, cols = 8 }) {
     ));
 }
 
+function SortableHead({ column, sortBy, sortDir, onSort, children }) {
+    return (
+        <TableHead
+            className="cursor-pointer select-none whitespace-nowrap"
+            onClick={() => onSort(column)}
+        >
+            <span className="inline-flex items-center">
+                {children}
+                {sortBy !== column ? (
+                    <ChevronsUpDown className="ml-1 h-3.5 w-3.5 text-muted-foreground" />
+                ) : sortDir === "asc" ? (
+                    <ChevronUp className="ml-1 h-3.5 w-3.5" />
+                ) : (
+                    <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                )}
+            </span>
+        </TableHead>
+    );
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function CoeRecordIndex() {
-    const { filters, records } = usePage().props;
+    const { filters: serverFilters, records } = usePage().props;
 
-    // Local filter state — drives the UI controls
-    const [search, setSearch] = useState(filters.search ?? "");
-    const [status, setStatus] = useState(filters.status ?? "");
-    const [coeType, setCoeType] = useState(filters.coe_type ?? "");
-    const [perPage, setPerPage] = useState(filters.per_page ?? 10);
-    const [sortBy, setSortBy] = useState(filters.sort_by ?? "id");
-    const [sortDir, setSortDir] = useState(filters.sort_dir ?? "desc");
+    // useCoeFilters hydrates the Zustand store from server filters on every
+    // Inertia navigation, so filters are always fresh — no stale closure risk.
+    const { filters, applyFilters, goToPage } = useCoeFilters(serverFilters);
 
-    const [isPending, startTransition] = useTransition();
-    const isLoading = isPending || records === undefined;
+    const {
+        search = "",
+        status = "",
+        coe_type = "",
+        per_page = 10,
+        sort_by = "id",
+        sort_dir = "desc",
+    } = filters;
 
-    // ── Navigate with encoded params ─────────────────────────────────────────
-    const navigate = useCallback(
-        (overrides = {}) => {
-            const params = {
-                search,
-                status,
-                coe_type: coeType,
-                per_page: perPage,
-                sort_by: sortBy,
-                sort_dir: sortDir,
-                page: 1, // reset to page 1 on any filter change
-                ...overrides,
-            };
-
-            startTransition(() => {
-                router.visit(buildUrl(params), {
-                    preserveScroll: true,
-                    preserveState: true,
-                    only: ["records", "filters"],
-                });
-            });
-        },
-        [search, status, coeType, perPage, sortBy, sortDir],
-    );
-
-    // ── Debounced search ─────────────────────────────────────────────────────
-    useEffect(() => {
-        const t = setTimeout(() => navigate({ search, page: 1 }), 400);
-        return () => clearTimeout(t);
-    }, [search]);
-
-    // ── Sort handler ─────────────────────────────────────────────────────────
-    function handleSort(column) {
-        const newDir = sortBy === column && sortDir === "asc" ? "desc" : "asc";
-        setSortBy(column);
-        setSortDir(newDir);
-        navigate({ sort_by: column, sort_dir: newDir, page: 1 });
-    }
-
-    // ── Pagination ───────────────────────────────────────────────────────────
-    function goToPage(page) {
-        navigate({ page });
-    }
-
-    // ── Column header button ─────────────────────────────────────────────────
-    function SortableHead({ column, children }) {
-        return (
-            <TableHead
-                className="cursor-pointer select-none whitespace-nowrap"
-                onClick={() => handleSort(column)}
-            >
-                <span className="inline-flex items-center">
-                    {children}
-                    <SortIcon
-                        column={column}
-                        sortBy={sortBy}
-                        sortDir={sortDir}
-                    />
-                </span>
-            </TableHead>
-        );
-    }
-
+    const isLoading = records === undefined;
     const data = records?.data ?? [];
     const meta = records ?? {};
-    const lastPage = meta.last_page ?? 1;
-    const total = meta.total ?? 0;
-    const from = meta.from ?? 0;
-    const to = meta.to ?? 0;
-    const page = filters.page ?? 1;
+
+    // ── Debounced search ──────────────────────────────────────────────────────
+    const debounceTimer = useRef(null);
+
+    function handleSearchChange(e) {
+        const value = e.target.value;
+        clearTimeout(debounceTimer.current);
+        debounceTimer.current = setTimeout(() => {
+            applyFilters({ search: value });
+        }, 400);
+    }
+
+    // ── Handlers ──────────────────────────────────────────────────────────────
+
+    function handleSort(column) {
+        const newDir =
+            sort_by === column && sort_dir === "asc" ? "desc" : "asc";
+        applyFilters({ sort_by: column, sort_dir: newDir });
+    }
+
+    function handleCoeTypeChange(value) {
+        applyFilters({ coe_type: value === "all" ? "" : value });
+    }
+
+    function handlePerPageChange(value) {
+        applyFilters({ per_page: Number(value) });
+    }
 
     return (
         <AuthenticatedLayout>
@@ -213,43 +207,18 @@ export default function CoeRecordIndex() {
                     <div className="relative flex-1 min-w-[200px] max-w-sm">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
+                            key={search}
                             placeholder="Search by Employee ID or purpose…"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            defaultValue={search}
+                            onChange={handleSearchChange}
                             className="pl-8"
                         />
                     </div>
 
-                    {/* Status filter */}
-                    <Select
-                        value={status || "all"}
-                        onValueChange={(v) => {
-                            const val = v === "all" ? "" : v;
-                            setStatus(val);
-                            navigate({ status: val, page: 1 });
-                        }}
-                    >
-                        <SelectTrigger className="w-[140px]">
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Status</SelectItem>
-                            {Object.entries(STATUS_MAP).map(([k, v]) => (
-                                <SelectItem key={k} value={k}>
-                                    {v.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
                     {/* COE Type filter */}
                     <Select
-                        value={coeType || "all"}
-                        onValueChange={(v) => {
-                            const val = v === "all" ? "" : v;
-                            setCoeType(val);
-                            navigate({ coe_type: val, page: 1 });
-                        }}
+                        value={String(coe_type) || "all"}
+                        onValueChange={handleCoeTypeChange}
                     >
                         <SelectTrigger className="w-[210px]">
                             <SelectValue placeholder="COE Type" />
@@ -270,12 +239,8 @@ export default function CoeRecordIndex() {
                             Rows per page
                         </span>
                         <Select
-                            value={String(perPage)}
-                            onValueChange={(v) => {
-                                const val = Number(v);
-                                setPerPage(val);
-                                navigate({ per_page: val, page: 1 });
-                            }}
+                            value={String(per_page)}
+                            onValueChange={handlePerPageChange}
                         >
                             <SelectTrigger className="w-[70px]">
                                 <SelectValue />
@@ -296,25 +261,78 @@ export default function CoeRecordIndex() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <SortableHead column="id">#</SortableHead>
-                                <SortableHead column="empid">
+                                <SortableHead
+                                    column="id"
+                                    sortBy={sort_by}
+                                    sortDir={sort_dir}
+                                    onSort={handleSort}
+                                >
+                                    #
+                                </SortableHead>
+                                <SortableHead
+                                    column="employid"
+                                    sortBy={sort_by}
+                                    sortDir={sort_dir}
+                                    onSort={handleSort}
+                                >
                                     Employee ID
                                 </SortableHead>
-                                <SortableHead column="purpose">
+                                <SortableHead
+                                    column="emp_position"
+                                    sortBy={sort_by}
+                                    sortDir={sort_dir}
+                                    onSort={handleSort}
+                                >
+                                    Position
+                                </SortableHead>
+                                <SortableHead
+                                    column="emp_class"
+                                    sortBy={sort_by}
+                                    sortDir={sort_dir}
+                                    onSort={handleSort}
+                                >
+                                    Class
+                                </SortableHead>
+                                <SortableHead
+                                    column="purpose"
+                                    sortBy={sort_by}
+                                    sortDir={sort_dir}
+                                    onSort={handleSort}
+                                >
                                     Purpose
                                 </SortableHead>
-                                <SortableHead column="date_request">
+                                <SortableHead
+                                    column="date_request"
+                                    sortBy={sort_by}
+                                    sortDir={sort_dir}
+                                    onSort={handleSort}
+                                >
                                     Date Requested
                                 </SortableHead>
-                                <SortableHead column="coe_type">
+                                <SortableHead
+                                    column="coe_type"
+                                    sortBy={sort_by}
+                                    sortDir={sort_dir}
+                                    onSort={handleSort}
+                                >
                                     COE Type
                                 </SortableHead>
                                 <TableHead>Approver 1</TableHead>
                                 <TableHead>Approver 2</TableHead>
-                                <SortableHead column="status">
+                                <SortableHead
+                                    column="status"
+                                    sortBy={sort_by}
+                                    sortDir={sort_dir}
+                                    onSort={handleSort}
+                                >
                                     Status
                                 </SortableHead>
-                                <SortableHead column="pcn_status">
+                                <SortableHead
+                                    column="pcn_status"
+                                    sortBy={sort_by}
+                                    sortDir={sort_dir}
+                                    onSort={handleSort}
+                                >
                                     PCN Status
                                 </SortableHead>
                                 <TableHead>Remarks</TableHead>
@@ -322,11 +340,11 @@ export default function CoeRecordIndex() {
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableSkeleton rows={perPage} cols={10} />
+                                <TableSkeleton rows={per_page} cols={12} />
                             ) : data.length === 0 ? (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={10}
+                                        colSpan={12}
                                         className="h-32 text-center text-muted-foreground"
                                     >
                                         No records found.
@@ -339,7 +357,13 @@ export default function CoeRecordIndex() {
                                             {row.id}
                                         </TableCell>
                                         <TableCell className="font-mono text-sm">
-                                            {row.empid ?? "—"}
+                                            {row.employid ?? "—"}
+                                        </TableCell>
+                                        <TableCell>
+                                            {row.emp_position ?? "—"}
+                                        </TableCell>
+                                        <TableCell>
+                                            {row.emp_class ?? "—"}
                                         </TableCell>
                                         <TableCell>
                                             {row.purpose ?? "—"}
@@ -370,7 +394,12 @@ export default function CoeRecordIndex() {
                                             {row.approver2_emp_num ?? "—"}
                                         </TableCell>
                                         <TableCell>
-                                            <StatusBadge status={row.status} />
+                                            <StatusBadge
+                                                status={row.status}
+                                                coeType={row.coe_type}
+                                                empClass={row.emp_class}
+                                                pcnStatus={row.pcn_status}
+                                            />
                                         </TableCell>
                                         <TableCell>
                                             {row.pcn_status ?? "—"}
@@ -386,55 +415,9 @@ export default function CoeRecordIndex() {
                 </div>
 
                 {/* ── Pagination ── */}
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>
-                        {isLoading
-                            ? "Loading…"
-                            : total > 0
-                              ? `Showing ${from}–${to} of ${total} records`
-                              : "No records"}
-                    </span>
-
-                    <div className="flex items-center gap-1">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            disabled={isLoading || page <= 1}
-                            onClick={() => goToPage(1)}
-                        >
-                            <ChevronsLeft className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            disabled={isLoading || page <= 1}
-                            onClick={() => goToPage(page - 1)}
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-
-                        <span className="px-3 tabular-nums">
-                            Page {page} of {lastPage}
-                        </span>
-
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            disabled={isLoading || page >= lastPage}
-                            onClick={() => goToPage(page + 1)}
-                        >
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            disabled={isLoading || page >= lastPage}
-                            onClick={() => goToPage(lastPage)}
-                        >
-                            <ChevronsRight className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </div>
+                {!isLoading && meta.last_page > 1 && (
+                    <Pagination meta={meta} onPageChange={goToPage} />
+                )}
             </div>
         </AuthenticatedLayout>
     );

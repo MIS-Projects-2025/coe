@@ -11,12 +11,13 @@ class CoeRecord extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'empid',
+        'employid',
+        'emp_position',
+        'emp_class',
+        'emp_sex',
         'purpose',
         'date_request',
         'coe_type',
-        'approver1_emp_num',
-        'approver2_emp_num',
         'status',
         'remarks',
         'pcn_status',

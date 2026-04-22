@@ -18,6 +18,12 @@ export default function NavLinks({ isSidebarOpen }) {
                 icon={<ClipboardList className="w-5 h-5" />}
                 isSidebarOpen={isSidebarOpen}
             />
+            <SidebarLink
+                href={route("coe-records.create")}
+                label="Request COE"
+                icon={<FileText className="w-5 h-5" />}
+                isSidebarOpen={isSidebarOpen}
+            />
         </nav>
     );
 }
