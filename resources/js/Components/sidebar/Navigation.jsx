@@ -11,6 +11,13 @@ export default function NavLinks({ isSidebarOpen }) {
         <nav
             className="flex flex-col flex-grow space-y-1 overflow-y-auto"
             style={{ scrollbarWidth: "none" }}
-        ></nav>
+        >
+            <SidebarLink
+                href={route("coe-records.index")}
+                label="COE Records"
+                icon={<ClipboardList className="w-5 h-5" />}
+                isSidebarOpen={isSidebarOpen}
+            />
+        </nav>
     );
 }
