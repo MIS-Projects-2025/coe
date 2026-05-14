@@ -24,4 +24,13 @@ Route::prefix($app_name)->middleware(AuthMiddleware::class)->group(function () {
 
     // Delete COE Request
     Route::delete('/coe-record/{id}', [CoeRecordController::class, 'destroy'])->name('coe-record.destroy');
+
+    // Fetch employee/salary data needed to preview & print a COE
+    Route::get('/coe-record/{id}/generate-data', [CoeRecordController::class, 'generateData'])->name('coe-record.generate-data');
+
+    // Get attachments for a COE record
+    Route::get('/coe-record/{id}/attachments', [CoeRecordController::class, 'getAttachments'])->name('coe-record.attachments');
+
+    // Bulk update status for multiple COE records
+    Route::put('/coe-records/bulk-status', [CoeRecordController::class, 'bulkUpdateStatus'])->name('coe-records.bulk-status');
 });

@@ -95,13 +95,14 @@ class HrisApiService
 
             // Normalize API field names → internal names
             return array_merge($raw, [
-                'acc_status'  => $raw['accstatus']       ?? null,  // 1=active, 2=separated
-                'emp_status'  => $raw['emp_status_id']   ?? null,  // 0=probationary, 1=regular
-                'date_hired'  => $raw['date_hired']      ?? null,
-                'date_reg'    => $raw['date_reg']        ?? null,
-                'prod_line'   => $raw['emp_prodline']    ?? null,  // name string e.g. "PL8"
-                'shift_type'  => $raw['shift_type']    ?? null,  // numeric shift type
-                'team'        => $raw['team']          ?? null,  // numeric team
+                'acc_status'     => $raw['accstatus']        ?? null,  // 1=active, 2=separated
+                'emp_status'     => $raw['emp_status_id']    ?? null,  // 0=probationary, 1=regular
+                'date_hired'     => $raw['date_hired']       ?? null,
+                'date_reg'       => $raw['date_reg']         ?? null,
+                'prod_line'      => $raw['emp_prodline']     ?? null,  // name string e.g. "PL8"
+                'shift_type'     => $raw['shift_type']       ?? null,  // numeric shift type
+                'team'           => $raw['team']             ?? null,  // numeric team
+                'emp_class_name' => $raw['emp_class_name']   ?? $raw['emp_class'] ?? null,
             ]);
         } catch (\Exception $e) {
             Log::error("HRIS fetchWorkDetails exception: {$e->getMessage()}", ['employid' => $employid]);
@@ -293,6 +294,67 @@ class HrisApiService
         } catch (\Exception $e) {
             Log::error("HRIS fetchEmployeesBulk exception: {$e->getMessage()}", ['emp_nos' => $empNos]);
             return [];
+        }
+    }
+
+    /**
+     * Fetch salary data for a specific employee, used when generating a
+     * With Compensation COE (coe_type = 3).
+     *
+     * Expected HRIS response (GET /api/employees/{id}/salary → data):
+     *   For emp_class 1 (daily/hourly):
+     *     salary_to_1           – daily/monthly rate (used as basic pay)
+     *     monthly_salary_annual – annualised amount (numeric string)
+     *     monthly_salary_words  – amount in words
+     *   For emp_class 2 (monthly):
+     *     salary_to             – monthly rate
+     *     annual_salary         – annualised amount
+     *     annual_salary_words   – amount in words
+     *
+     * Returns a normalized array with keys used by the CoeWithComp component:
+     *   basic_pay, thirteenth_month, annual_salary, annual_salary_words
+     *
+     * Returns null when the request fails or no salary record exists.
+     */
+    public function fetchSalaryData(int $employid, int $empClass): ?array
+    {
+        try {
+            $response = Http::withHeaders([
+                'X-Internal-Key' => $this->key,
+            ])->get("{$this->baseUrl}/api/employees/{$employid}/salary");
+
+            if ($response->failed()) {
+                Log::warning('HRIS fetchSalaryData failed', [
+                    'employid' => $employid,
+                    'status'   => $response->status(),
+                ]);
+                return null;
+            }
+
+            $data = $response->json('data');
+            if (!$data) {
+                return null;
+            }
+
+            // Normalize field names to what the frontend CoeWithComp component expects
+            if ($empClass === 1) {
+                return [
+                    'basic_pay'           => $data['salary_to_1']           ?? null,
+                    'thirteenth_month'    => $data['salary_to_1']           ?? null,
+                    'annual_salary'       => $data['monthly_salary_annual'] ?? null,
+                    'annual_salary_words' => $data['monthly_salary_words']  ?? null,
+                ];
+            }
+
+            return [
+                'basic_pay'           => $data['salary_to']          ?? null,
+                'thirteenth_month'    => $data['salary_to']          ?? null,
+                'annual_salary'       => $data['annual_salary']      ?? null,
+                'annual_salary_words' => $data['annual_salary_words'] ?? null,
+            ];
+        } catch (\Exception $e) {
+            Log::error("HRIS fetchSalaryData exception: {$e->getMessage()}", ['employid' => $employid]);
+            return null;
         }
     }
 

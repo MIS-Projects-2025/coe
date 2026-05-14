@@ -6,6 +6,7 @@ const DEFAULTS = {
     search: "",
     status: "",
     coe_type: "",
+    tab: "pending",
     per_page: 10,
     sort_by: "id",
     sort_dir: "desc",
