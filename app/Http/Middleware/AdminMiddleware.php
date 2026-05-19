@@ -2,9 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\AdminList;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 class AdminMiddleware
@@ -17,11 +17,9 @@ class AdminMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         if (session('emp_data')) {
-            $checkIfExists = DB::table('admin')
-                ->where('emp_id', session('emp_data')['emp_id'])
-                ->exists();
+            $exists = AdminList::where('admin_id', session('emp_data')['emp_id'])->exists();
 
-            if (!$checkIfExists) {
+            if (! $exists) {
                 return redirect()->route('dashboard');
             }
         }

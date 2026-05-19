@@ -21,12 +21,12 @@ export const EMP_CLASS_MAP = {
 
 export function getStatusInfo(status) {
     switch (Number(status)) {
-        case 0: return { label: "For Approval",       color: "bg-yellow-500 text-white" };
-        case 1: return { label: "Approved",            color: "bg-green-600 text-white" };
-        case 2: return { label: "Generated",           color: "bg-blue-500 text-white" };
-        case 3: return { label: "Disapproved",         color: "bg-red-600 text-white" };
-        case 5: return { label: "Available for Claim", color: "bg-orange-500 text-white" };
-        default: return { label: "Unknown",            color: "bg-gray-400 text-white" };
+        case 0: return { label: "For Approval",       color: "border-transparent bg-yellow-500 text-white" };
+        case 1: return { label: "Approved",            color: "border-transparent bg-green-600 text-white" };
+        case 2: return { label: "Generated",           color: "border-transparent bg-blue-500 text-white" };
+        case 3: return { label: "Disapproved",         color: "border-transparent bg-red-600 text-white" };
+        case 5: return { label: "Available for Claim", color: "border-transparent bg-orange-500 text-white" };
+        default: return { label: "Unknown",            color: "border-transparent bg-gray-400 text-white" };
     }
 }
 

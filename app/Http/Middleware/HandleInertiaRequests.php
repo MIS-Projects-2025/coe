@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\AdminList;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -32,6 +33,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'emp_data' => fn() => session('emp_data'),
+            'isAdmin'  => fn() => AdminList::where('admin_id', session('emp_data')['emp_id'] ?? '')->exists(),
             'flash' => [
                 'success' => fn() => $request->session()->get('success'),
                 'error'   => fn() => $request->session()->get('error'),
