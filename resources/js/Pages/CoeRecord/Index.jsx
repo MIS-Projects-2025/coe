@@ -7,17 +7,17 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+} from "@/Components/ui/table";
+import { Input } from "@/Components/ui/input";
+import { Badge } from "@/Components/ui/badge";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "@/Components/ui/select";
+import { Skeleton } from "@/Components/ui/skeleton";
 import { ChevronUp, ChevronDown, ChevronsUpDown, Search } from "lucide-react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Pagination } from "@/Components/Pagination";
@@ -371,15 +371,15 @@ export default function CoeRecordIndex() {
                                         <TableCell className="whitespace-nowrap text-sm">
                                             {row.date_request
                                                 ? new Date(
-                                                      row.date_request,
-                                                  ).toLocaleDateString(
-                                                      "en-PH",
-                                                      {
-                                                          year: "numeric",
-                                                          month: "short",
-                                                          day: "numeric",
-                                                      },
-                                                  )
+                                                    row.date_request,
+                                                ).toLocaleDateString(
+                                                    "en-PH",
+                                                    {
+                                                        year: "numeric",
+                                                        month: "short",
+                                                        day: "numeric",
+                                                    },
+                                                )
                                                 : "—"}
                                         </TableCell>
                                         <TableCell>
